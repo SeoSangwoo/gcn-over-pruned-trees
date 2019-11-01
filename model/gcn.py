@@ -11,6 +11,8 @@ import numpy as np
 from model.tree import Tree, head_to_tree, tree_to_adj
 from utils import constant, torch_utils
 
+import math
+
 class GCNClassifier(nn.Module):
     """ A wrapper classifier for GCNRelationModel. """
     def __init__(self, opt, emb_matrix=None):
@@ -75,8 +77,8 @@ class GCNRelationModel(nn.Module):
 
         def inputs_to_tree_reps(head, words, l, prune, subj_pos, obj_pos):
             head, words, subj_pos, obj_pos = head.cpu().numpy(), words.cpu().numpy(), subj_pos.cpu().numpy(), obj_pos.cpu().numpy()
-            trees = [head_to_tree(head[i], words[i], l[i], prune, subj_pos[i], obj_pos[i]) for i in range(len(l))]
-            adj = [tree_to_adj(maxlen, tree, directed=False, self_loop=False).reshape(1, maxlen, maxlen) for tree in trees]
+            trees = [head_to_tree(head[i], words[i], l[i], -1, subj_pos[i], obj_pos[i]) for i in range(len(l))]
+            adj = [tree_to_adj(maxlen, tree, directed=False, self_loop=True).reshape(1, maxlen, maxlen) for tree in trees]
             adj = np.concatenate(adj, axis=0)
             adj = torch.from_numpy(adj)
             return Variable(adj.cuda()) if self.opt['cuda'] else Variable(adj)
@@ -120,10 +122,13 @@ class GCN(nn.Module):
         # gcn layer
         self.W = nn.ModuleList()
 
+        self.query_linear = nn.Linear(self.in_dim, self.mem_dim/2)
+        self.key_linear = nn.Linear(self.in_dim, self.mem_dim/2)
+
         for layer in range(self.layers):
             input_dim = self.in_dim if layer == 0 else self.mem_dim
             self.W.append(nn.Linear(input_dim, self.mem_dim))
-
+        
     def conv_l2(self):
         conv_weights = []
         for w in self.W:
@@ -162,11 +167,20 @@ class GCN(nn.Module):
         if self.opt.get('no_adj', False):
             adj = torch.zeros_like(adj)
 
+        query = self.query_linear(gcn_inputs)
+        key = self.key_linear(gcn_inputs)
+
+        scores = torch.matmul(query, key.transpose(-2, -1)) \
+            / math.sqrt(query.size(-1))
+
+        adj = scores - (1-adj)*(2**30)
+        adj = F.softmax(adj, dim=-1)
+
         for l in range(self.layers):
             Ax = adj.bmm(gcn_inputs)
             AxW = self.W[l](Ax)
-            AxW = AxW + self.W[l](gcn_inputs) # self loop
-            AxW = AxW / denom
+            # AxW = AxW + self.W[l](gcn_inputs) # self loop
+            # AxW = AxW / denom
 
             gAxW = F.relu(AxW)
             gcn_inputs = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
@@ -192,4 +206,3 @@ def rnn_zero_state(batch_size, hidden_dim, num_layers, bidirectional=True, use_c
         return h0.cuda(), c0.cuda()
     else:
         return h0, c0
-
