@@ -48,7 +48,7 @@ parser.add_argument('--rnn_hidden', type=int, default=200, help='RNN hidden stat
 parser.add_argument('--rnn_layers', type=int, default=1, help='Number of RNN layers.')
 parser.add_argument('--rnn_dropout', type=float, default=0.5, help='RNN dropout rate.')
 
-parser.add_argument('--lr', type=float, default=1.0, help='Applies to sgd and adagrad.')
+parser.add_argument('--lr', type=float, default=0.7, help='Applies to sgd and adagrad.')
 parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate decay rate.')
 parser.add_argument('--decay_epoch', type=int, default=5, help='Decay learning rate after this epoch.')
 parser.add_argument('--optim', choices=['sgd', 'adagrad', 'adam', 'adamax'], default='sgd', help='Optimizer: sgd, adagrad, adam or adamax.')
