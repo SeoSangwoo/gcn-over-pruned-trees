@@ -44,10 +44,10 @@ class GCNRelationModel(nn.Module):
         self.init_embeddings()
 
         # gcn layer
-        self.gcn = GCN(opt, embeddings, opt['hidden_dim']*2, opt['num_layers'])
+        self.gcn = GCN(opt, embeddings, opt['hidden_dim'], opt['num_layers'])
 
         # output mlp layers
-        in_dim = opt['hidden_dim']*6
+        in_dim = opt['hidden_dim']*3
         layers = [nn.Linear(in_dim, opt['hidden_dim']), nn.ReLU()]
         for _ in range(self.opt['mlp_layers']-1):
             layers += [nn.Linear(opt['hidden_dim'], opt['hidden_dim']), nn.ReLU()]
@@ -85,17 +85,6 @@ class GCNRelationModel(nn.Module):
 
         adj = inputs_to_tree_reps(head.data, words.data, l, self.opt['prune_k'], subj_pos.data, obj_pos.data)
         h, rnn_outputs, pool_mask, gcn_inputs_sub_mask, gcn_inputs_obj_mask = self.gcn(adj, inputs)
-
-        # beta = rnn_outputs.bmm(gcn_inputs_sub_mask.transpose(1,2)).sum(2)
-        # alpha = F.softmax(beta, dim=-1).unsqueeze(2)
-        # r = alpha * rnn_outputs
-        # r_sub = r.sum(1)
-
-        # beta = rnn_outputs.bmm(gcn_inputs_obj_mask.transpose(1,2)).sum(2)
-        # alpha = F.softmax(beta, dim=-1).unsqueeze(2)
-        # r = alpha * rnn_outputs
-        # r_obj = r.sum(1)
-
         
         # pooling
         subj_mask, obj_mask = subj_pos.eq(0).eq(0).unsqueeze(2), obj_pos.eq(0).eq(0).unsqueeze(2) # invert mask
@@ -105,7 +94,6 @@ class GCNRelationModel(nn.Module):
         subj_out = pool(gcn_inputs_sub_mask, subj_mask, type=pool_type)
         obj_out = pool(gcn_inputs_obj_mask, obj_mask, type=pool_type)
 
-        # outputs = r
         outputs = torch.cat([subj_out, obj_out, h_out], dim=1)
         outputs = self.out_mlp(outputs)
         return outputs, h_out
@@ -199,12 +187,9 @@ class GCN(nn.Module):
         scores = torch.matmul(query, key.transpose(-2, -1)) \
             / math.sqrt(query.size(-1))
             
-        scores = scores.masked_fill(src_mask == 0, -2**30)
-
         adj = scores - (1-adj)*(2**30)
         adj = F.softmax(adj, dim=-1)
         
-
         gcn_inputs_sub_mask = gcn_inputs.masked_fill(subj_mask, 0)
         gcn_inputs_obj_mask = gcn_inputs.masked_fill(obj_mask, 0)
 

@@ -26,7 +26,7 @@ parser.add_argument('--vocab_dir', type=str, default='dataset/vocab')
 parser.add_argument('--emb_dim', type=int, default=300, help='Word embedding dimension.')
 parser.add_argument('--ner_dim', type=int, default=30, help='NER embedding dimension.')
 parser.add_argument('--pos_dim', type=int, default=30, help='POS embedding dimension.')
-parser.add_argument('--hidden_dim', type=int, default=100, help='RNN hidden state size.')
+parser.add_argument('--hidden_dim', type=int, default=200, help='RNN hidden state size.')
 parser.add_argument('--num_layers', type=int, default=2, help='Num of RNN layers.')
 parser.add_argument('--input_dropout', type=float, default=0.5, help='Input dropout rate.')
 parser.add_argument('--gcn_dropout', type=float, default=0.5, help='GCN layer dropout rate.')
@@ -45,9 +45,8 @@ parser.add_argument('--no_adj', dest='no_adj', action='store_true', help="Zero o
 
 parser.add_argument('--no-rnn', dest='rnn', action='store_false', help='Do not use RNN layer.')
 parser.add_argument('--rnn_hidden', type=int, default=100, help='RNN hidden state size.')
-parser.add_argument('--rnn_layers', type=int, default=1, help='Number of RNN layers.')
+parser.add_argument('--rnn_layers', type=int, default=2, help='Number of RNN layers.')
 parser.add_argument('--rnn_dropout', type=float, default=0.5, help='RNN dropout rate.')
-parser.add_argument('--heads', type=int, default=4, help='Num of heads in multi-head attention.')
 
 parser.add_argument('--lr', type=float, default=0.7, help='Applies to sgd and adagrad.')
 parser.add_argument('--lr_decay', type=float, default=0.9, help='Learning rate decay rate.')
@@ -98,7 +97,7 @@ assert emb_matrix.shape[1] == opt['emb_dim']
 # load data
 print("Loading data from {} with batch size {}...".format(opt['data_dir'], opt['batch_size']))
 train_batch = DataLoader(opt['data_dir'] + '/train.json', opt['batch_size'], opt, vocab, evaluation=False)
-dev_batch = DataLoader(opt['data_dir'] + '/dev.json', opt['batch_size'], opt, vocab, evaluation=True)
+dev_batch = DataLoader(opt['data_dir'] + '/test.json', opt['batch_size'], opt, vocab, evaluation=True)
 
 model_id = opt['id'] if len(opt['id']) > 1 else '0' + opt['id']
 model_save_dir = opt['save_dir'] + '/' + model_id

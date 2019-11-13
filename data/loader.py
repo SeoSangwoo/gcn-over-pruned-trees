@@ -6,7 +6,7 @@ import json
 import random
 import torch
 import numpy as np
-
+import copy
 from utils import constant, helper, vocab
 
 class DataLoader(object):
@@ -49,12 +49,16 @@ class DataLoader(object):
             # anonymize tokens
             ss, se = d['subj_start'], d['subj_end']
             os, oe = d['obj_start'], d['obj_end']
-            tokens[ss:se+1] = ['SUBJ-'+d['subj_type']] * (se-ss+1)
-            tokens[os:oe+1] = ['OBJ-'+d['obj_type']] * (oe-os+1)
+            # tokens[ss:se+1] = ['SUBJ-'+d['subj_type']] * (se-ss+1)
+            # tokens[os:oe+1] = ['OBJ-'+d['obj_type']] * (oe-os+1)
+            
+            print(tokens)
+            print(d['subj_start'], d['subj_end'], d['obj_start'], d['obj_end'])
+            print(d['stanford_head'])
             tokens = map_to_ids(tokens, vocab.word2id)
             pos = map_to_ids(d['stanford_pos'], constant.POS_TO_ID)
             ner = map_to_ids(d['stanford_ner'], constant.NER_TO_ID)
-            deprel = map_to_ids(d['stanford_deprel'], constant.DEPREL_TO_ID)
+            deprel = map_to_ids([" "]*len(tokens), constant.DEPREL_TO_ID)
             head = [int(x) for x in d['stanford_head']]
             assert any([x == 0 for x in head])
             l = len(tokens)
