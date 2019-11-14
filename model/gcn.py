@@ -107,6 +107,7 @@ class GCN(nn.Module):
         self.use_cuda = opt['cuda']
         self.mem_dim = mem_dim
         self.in_dim = opt['emb_dim'] + opt['pos_dim'] + opt['ner_dim']
+        self.alpha = opt['alpha']
 
         self.emb, self.pos_emb, self.ner_emb = embeddings
 
@@ -171,6 +172,9 @@ class GCN(nn.Module):
             gcn_inputs = embs
         rnn_outputs = gcn_inputs
         subj_mask, obj_mask = subj_pos.eq(0).unsqueeze(2), obj_pos.eq(0).unsqueeze(2) # invert mask
+
+        subj_weight = self.alpha * subj_mask + subj_mask.eq(0)
+        obj_weight = self.alpha * obj_mask + obj_mask.eq(0)
         
         # gcn layer
         denom = adj.sum(2).unsqueeze(2) + 1
@@ -190,8 +194,8 @@ class GCN(nn.Module):
         adj = scores - (1-adj)*(2**30)
         adj = F.softmax(adj, dim=-1)
         
-        gcn_inputs_sub_mask = gcn_inputs.masked_fill(subj_mask, 0)
-        gcn_inputs_obj_mask = gcn_inputs.masked_fill(obj_mask, 0)
+        gcn_inputs_sub_mask = gcn_inputs * subj_weight
+        gcn_inputs_obj_mask = gcn_inputs * obj_weight
 
         for l in range(self.layers):
             Ax = adj.bmm(gcn_inputs)
@@ -204,16 +208,16 @@ class GCN(nn.Module):
             gAxW = F.relu(AxW)
             gcn_inputs_sub_mask = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
             if l < self.layers - 1:
-                gcn_inputs_sub_mask = gcn_inputs_sub_mask.masked_fill(subj_mask, 0)
-
+                gcn_inputs_sub_mask = gcn_inputs_sub_mask * subj_weight
+                
             Ax = adj.bmm(gcn_inputs_obj_mask)
             AxW = self.W[l](Ax)
             gAxW = F.relu(AxW)
             gcn_inputs_obj_mask = self.gcn_drop(gAxW) if l < self.layers - 1 else gAxW
             if l < self.layers - 1:
-                gcn_inputs_obj_mask = gcn_inputs_obj_mask.masked_fill(obj_mask, 0)
-
-        return gcn_inputs, rnn_outputs, mask, gcn_inputs_sub_mask.masked_fill(subj_mask.eq(0), 0), gcn_inputs_obj_mask.masked_fill(obj_mask.eq(0), 0)
+                gcn_inputs_obj_mask = gcn_inputs_obj_mask * obj_weight
+        
+        return gcn_inputs, rnn_outputs, mask, gcn_inputs_sub_mask, gcn_inputs_obj_mask
 
 def pool(h, mask, type='max'):
     if type == 'max':
